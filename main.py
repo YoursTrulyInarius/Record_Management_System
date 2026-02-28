@@ -150,6 +150,18 @@ class ViewRecordsScreen(tk.Frame):
         
         self.canvas.pack(side="left", fill="both", expand=True, padx=10, pady=5)
         self.scrollbar.pack(side="right", fill="y")
+        
+        # Bind mouse wheel for scrolling
+        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+        # For Linux
+        self.canvas.bind_all("<Button-4>", self._on_mousewheel)
+        self.canvas.bind_all("<Button-5>", self._on_mousewheel)
+
+    def _on_mousewheel(self, event):
+        if event.num == 4 or event.delta > 0:
+            self.canvas.yview_scroll(-1, "units")
+        elif event.num == 5 or event.delta < 0:
+            self.canvas.yview_scroll(1, "units")
 
     def _clear_search_placeholder(self, event):
         if self.search_ent.get() == "Search records...":
@@ -248,7 +260,32 @@ class AddRecordScreen(tk.Frame):
         super().__init__(parent, bg=COLOR_BG_PRIMARY)
         self.controller = controller
         
-        self.form_container = tk.Frame(self, bg=COLOR_BG_PRIMARY, padx=30, pady=30)
+        # Scrollable setup for AddRecordScreen
+        self.canvas = tk.Canvas(self, bg=COLOR_BG_PRIMARY, highlightthickness=0)
+        self.scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
+        self.scrollable_frame = tk.Frame(self.canvas, bg=COLOR_BG_PRIMARY)
+        
+        self.scrollable_frame.bind(
+            "<Configure>",
+            lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+        )
+        
+        self.window_id = self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        
+        # Sync width of inner frame to canvas width
+        self.canvas.bind('<Configure>', self._on_canvas_configure)
+        
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+        
+        self.canvas.pack(side="left", fill="both", expand=True)
+        self.scrollbar.pack(side="right", fill="y")
+        
+        # Mousewheel binding
+        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+        self.canvas.bind_all("<Button-4>", self._on_mousewheel)
+        self.canvas.bind_all("<Button-5>", self._on_mousewheel)
+
+        self.form_container = tk.Frame(self.scrollable_frame, bg=COLOR_BG_PRIMARY, padx=30, pady=30)
         self.form_container.pack(fill="both", expand=True)
         
         # Elevation layer for form
@@ -285,6 +322,16 @@ class AddRecordScreen(tk.Frame):
                                     font=FONT_TITLE, bd=0, activebackground="#2980b9", activeforeground="white", 
                                     cursor="hand2", command=self.save, pady=15)
         self.btn_submit.pack(fill="x", pady=(30, 10))
+
+    def _on_canvas_configure(self, event):
+        self.canvas.itemconfig(self.window_id, width=event.width)
+
+    def _on_mousewheel(self, event):
+        # Only scroll if this frame or its children are focused (or just scroll anyway like a modern app)
+        if event.num == 4 or event.delta > 0:
+            self.canvas.yview_scroll(-1, "units")
+        elif event.num == 5 or event.delta < 0:
+            self.canvas.yview_scroll(1, "units")
 
     def save(self):
         data = {k: v.get().strip() for k, v in self.entries.items()}
@@ -350,7 +397,32 @@ class EditSheet(tk.Toplevel):
         self.geometry("400x600")
         self.configure(bg=COLOR_BG_PRIMARY)
         
-        self.container = tk.Frame(self, bg=COLOR_BG_PRIMARY, padx=20, pady=20)
+        # Scrollable setup for EditSheet
+        self.canvas = tk.Canvas(self, bg=COLOR_BG_PRIMARY, highlightthickness=0)
+        self.scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
+        self.scrollable_frame = tk.Frame(self.canvas, bg=COLOR_BG_PRIMARY)
+        
+        self.scrollable_frame.bind(
+            "<Configure>",
+            lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+        )
+        
+        self.window_id = self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        
+        # Sync width
+        self.canvas.bind('<Configure>', self._on_canvas_configure)
+        
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+        
+        self.canvas.pack(side="left", fill="both", expand=True)
+        self.scrollbar.pack(side="right", fill="y")
+        
+        # Mousewheel binding
+        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+        self.canvas.bind_all("<Button-4>", self._on_mousewheel)
+        self.canvas.bind_all("<Button-5>", self._on_mousewheel)
+
+        self.container = tk.Frame(self.scrollable_frame, bg=COLOR_BG_PRIMARY, padx=20, pady=20)
         self.container.pack(fill="both", expand=True)
         
         tk.Label(self.container, text="Update Record", font=FONT_TITLE, bg=COLOR_BG_PRIMARY, fg=COLOR_NAV_TEXT).pack(pady=(0, 20))
@@ -359,8 +431,8 @@ class EditSheet(tk.Toplevel):
         fields = ["Name", "Age", "Address", "Contact", "Email"]
         current = [rec[1], rec[2], rec[3], rec[4], rec[5]]
         
-        vcmd_contact = (self.register(parent.master.master.validate_contact), '%P')
-        vcmd_age = (self.register(parent.master.master.validate_age), '%P')
+        vcmd_contact = (self.register(parent.controller.validate_contact), '%P')
+        vcmd_age = (self.register(parent.controller.validate_age), '%P')
         
         for i, field in enumerate(fields):
             tk.Label(self.container, text=field, bg=COLOR_BG_PRIMARY, font=FONT_LABEL).pack(anchor="w", pady=(10, 2))
@@ -381,6 +453,15 @@ class EditSheet(tk.Toplevel):
             
         tk.Button(self.container, text="Confirm Changes", bg=COLOR_ACCENT, fg="white", 
                   font=FONT_TITLE, bd=0, cursor="hand2", command=self.save, pady=12).pack(fill="x", pady=30)
+
+    def _on_canvas_configure(self, event):
+        self.canvas.itemconfig(self.window_id, width=event.width)
+
+    def _on_mousewheel(self, event):
+        if event.num == 4 or event.delta > 0:
+            self.canvas.yview_scroll(-1, "units")
+        elif event.num == 5 or event.delta < 0:
+            self.canvas.yview_scroll(1, "units")
 
     def save(self):
         data = {k: v.get().strip() for k, v in self.entries.items()}
