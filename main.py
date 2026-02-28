@@ -107,11 +107,30 @@ class RecordSystemApp(tk.Tk):
             return True
         return False
 
+    def validate_age(self, P):
+        if len(P) > 3: # Reasonable age limit digits
+            return False
+        if P == "" or P.isdigit():
+            return True
+        return False
+
 class ViewRecordsScreen(tk.Frame):
     def __init__(self, parent, controller):
         super().__init__(parent, bg=COLOR_BG_PRIMARY)
         self.controller = controller
         
+        # --- Search Bar ---
+        search_frame = tk.Frame(self, bg=COLOR_BG_PRIMARY, padx=15, pady=5)
+        search_frame.pack(fill="x")
+        
+        self.search_ent = tk.Entry(search_frame, font=FONT_ENTRY, bg="#ffffff", bd=1, relief="flat",
+                                   highlightthickness=1, highlightbackground=COLOR_BORDER)
+        self.search_ent.pack(fill="x", ipady=8)
+        self.search_ent.insert(0, "Search records...")
+        self.search_ent.bind("<FocusIn>", self._clear_search_placeholder)
+        self.search_ent.bind("<FocusOut>", self._restore_search_placeholder)
+        self.search_ent.bind("<KeyRelease>", lambda e: self.load_records())
+
         # List of Records (Using a Canvas + Frame for a smooth scrolling card list)
         self.canvas = tk.Canvas(self, bg=COLOR_BG_PRIMARY, highlightthickness=0)
         self.scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
@@ -129,8 +148,18 @@ class ViewRecordsScreen(tk.Frame):
         
         self.canvas.configure(yscrollcommand=self.scrollbar.set)
         
-        self.canvas.pack(side="left", fill="both", expand=True, padx=10, pady=10)
+        self.canvas.pack(side="left", fill="both", expand=True, padx=10, pady=5)
         self.scrollbar.pack(side="right", fill="y")
+
+    def _clear_search_placeholder(self, event):
+        if self.search_ent.get() == "Search records...":
+            self.search_ent.delete(0, tk.END)
+            self.search_ent.config(fg="black")
+
+    def _restore_search_placeholder(self, event):
+        if not self.search_ent.get():
+            self.search_ent.insert(0, "Search records...")
+            self.search_ent.config(fg="gray")
         
     def _on_canvas_configure(self, event):
         self.canvas.itemconfig(self.window_id, width=event.width)
@@ -144,9 +173,14 @@ class ViewRecordsScreen(tk.Frame):
             widget.destroy()
             
         try:
-            records = Database().get_records()
+            query = self.search_ent.get()
+            if query == "Search records...":
+                query = None
+                
+            records = Database().get_records(query)
             if not records:
-                tk.Label(self.scrollable_frame, text="No records yet", bg=COLOR_BG_PRIMARY, font=FONT_LABEL).pack(pady=50)
+                msg = "No results found" if query else "No records yet"
+                tk.Label(self.scrollable_frame, text=msg, bg=COLOR_BG_PRIMARY, font=FONT_LABEL).pack(pady=50)
                 return
                 
             for rec in records:
@@ -227,13 +261,19 @@ class AddRecordScreen(tk.Frame):
         self.entries = {}
         fields = ["Name", "Age", "Address", "Contact", "Email"]
         
-        vcmd = (self.register(controller.validate_contact), '%P')
+        vcmd_contact = (self.register(controller.validate_contact), '%P')
+        vcmd_age = (self.register(controller.validate_age), '%P')
+        
         for field in fields:
             tk.Label(inner_form, text=field.upper(), bg=COLOR_CARD_BG, font=FONT_LABEL, fg="#a5b1c2").pack(anchor="w", pady=(10, 2))
             if field == "Contact":
                 ent = tk.Entry(inner_form, font=FONT_ENTRY, bg="#f8f9fa", bd=1, relief="flat", 
                                highlightthickness=1, highlightbackground=COLOR_BORDER,
-                               validate='key', validatecommand=vcmd)
+                               validate='key', validatecommand=vcmd_contact)
+            elif field == "Age":
+                ent = tk.Entry(inner_form, font=FONT_ENTRY, bg="#f8f9fa", bd=1, relief="flat", 
+                               highlightthickness=1, highlightbackground=COLOR_BORDER,
+                               validate='key', validatecommand=vcmd_age)
             else:
                 ent = tk.Entry(inner_form, font=FONT_ENTRY, bg="#f8f9fa", bd=1, relief="flat", 
                                highlightthickness=1, highlightbackground=COLOR_BORDER)
@@ -275,9 +315,13 @@ class AddRecordScreen(tk.Frame):
             messagebox.showerror("Validation", "Invalid Email: Must contain '@'")
             return
         
+        if "'" in email or '"' in email:
+            messagebox.showerror("Validation", "Email cannot contain quotation marks")
+            return
+            
         # Basic Email Regex for better assurance
-        if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
-            messagebox.showerror("Validation", "Invalid Email format (e.g. user@example.com)")
+        if not re.match(r"[^@\"']+\@[^@\"']+\.[^@\"']+", email):
+            messagebox.showerror("Validation", "Invalid Email format (e.g. user@example.com) and no quotes allowed")
             return
             
         try:
@@ -315,13 +359,19 @@ class EditSheet(tk.Toplevel):
         fields = ["Name", "Age", "Address", "Contact", "Email"]
         current = [rec[1], rec[2], rec[3], rec[4], rec[5]]
         
-        vcmd = (self.register(parent.master.master.validate_contact), '%P')
+        vcmd_contact = (self.register(parent.master.master.validate_contact), '%P')
+        vcmd_age = (self.register(parent.master.master.validate_age), '%P')
+        
         for i, field in enumerate(fields):
             tk.Label(self.container, text=field, bg=COLOR_BG_PRIMARY, font=FONT_LABEL).pack(anchor="w", pady=(10, 2))
             if field == "Contact":
                 ent = tk.Entry(self.container, font=FONT_ENTRY, bg="#ffffff", bd=1, relief="flat", 
                                highlightthickness=1, highlightbackground=COLOR_BORDER,
-                               validate='key', validatecommand=vcmd)
+                               validate='key', validatecommand=vcmd_contact)
+            elif field == "Age":
+                ent = tk.Entry(self.container, font=FONT_ENTRY, bg="#ffffff", bd=1, relief="flat", 
+                               highlightthickness=1, highlightbackground=COLOR_BORDER,
+                               validate='key', validatecommand=vcmd_age)
             else:
                 ent = tk.Entry(self.container, font=FONT_ENTRY, bg="#ffffff", bd=1, relief="flat", 
                                highlightthickness=1, highlightbackground=COLOR_BORDER)
@@ -358,6 +408,14 @@ class EditSheet(tk.Toplevel):
 
         if "@" not in email:
             messagebox.showerror("Validation", "Invalid Email: Must contain '@'")
+            return
+            
+        if "'" in email or '"' in email:
+            messagebox.showerror("Validation", "Email cannot contain quotation marks")
+            return
+            
+        if not re.match(r"[^@\"']+\@[^@\"']+\.[^@\"']+", email):
+            messagebox.showerror("Validation", "Invalid Email format and no quotes allowed")
             return
 
         try:

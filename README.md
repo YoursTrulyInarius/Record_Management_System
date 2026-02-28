@@ -1,14 +1,15 @@
-# Student Record Management System
+# Record Management System
 
 A sleek, mobile-first desktop application for managing personal or organization records. Developed using Python's Tkinter framework and SQLite for local data persistence.
 
 ## Features
 - **Mobile-First Design**: Optimized for a 400x700 aspect ratio with a clean, modern UI.
 - **Full CRUD Operations**: Create, Read, Update, and Delete records effortlessly.
+- **Search Functionality**: Real-time filtering by Name, Email, or Address.
 - **Advanced Validation**:
-    - Contact numbers are strictly limited to **11 digits**.
-    - Real-time restriction prevents non-numeric input in the contact field.
-    - Robust email validation requiring the "@" symbol.
+    - **Age**: Numeric only (0-9).
+    - **Contact**: Strictly limited to **11 digits**.
+    - **Email**: Must contain "@" and **no quotation marks**.
 - **Duplicate Prevention**: Intelligently blocks duplicate entries based on Name or Email collisions.
 - **Premium Aesthetics**: Elevated cards, simulated shadows, and structured data layouts for a high-end feel.
 - **Zero Dependencies**: Runs on standard Python 3.x with no external libraries required.

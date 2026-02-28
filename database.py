@@ -31,10 +31,17 @@ class Database:
                            (name, age, address, contact, email))
             conn.commit()
 
-    def get_records(self):
+    def get_records(self, query=None):
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM records")
+            if query:
+                search_query = f"%{query}%"
+                cursor.execute("""
+                    SELECT * FROM records 
+                    WHERE name LIKE ? OR email LIKE ? OR address LIKE ?
+                """, (search_query, search_query, search_query))
+            else:
+                cursor.execute("SELECT * FROM records")
             return cursor.fetchall()
 
     def get_record_by_id(self, record_id):
