@@ -41,27 +41,22 @@ class Database:
             conn.commit()
 
     def _generate_student_id(self):
+        import random
+        import string
+        
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            year = datetime.datetime.now().year
-            prefix = f"STD-{year}-"
             
-            # Find the highest number for the current year
-            cursor.execute("SELECT student_id FROM records WHERE student_id LIKE ? ORDER BY student_id DESC LIMIT 1", (f"{prefix}%",))
-            last_id = cursor.fetchone()
-            
-            if last_id and last_id[0]:
-                try:
-                    # Extract numeric part from STD-YYYY-NNNN
-                    parts = last_id[0].split("-")
-                    last_num = int(parts[-1])
-                    new_num = last_num + 1
-                except (ValueError, IndexError):
-                    new_num = 1
-            else:
-                new_num = 1
+            while True:
+                # Generate a random 6-character alphanumeric string
+                chars = string.ascii_uppercase + string.digits
+                code = ''.join(random.choice(chars) for _ in range(6))
+                student_id = f"STD-{code}"
                 
-            return f"{prefix}{new_num:04d}"
+                # Verify uniqueness in the database
+                cursor.execute("SELECT 1 FROM records WHERE student_id = ?", (student_id,))
+                if not cursor.fetchone():
+                    return student_id
 
     def add_record(self, name, age, course, section, address, contact, email):
         with self.get_connection() as conn:
@@ -79,9 +74,10 @@ class Database:
                 cursor.execute("""
                     SELECT * FROM records 
                     WHERE name LIKE ? OR email LIKE ? OR address LIKE ? OR student_id LIKE ? OR course LIKE ? OR section LIKE ?
+                    ORDER BY id DESC
                 """, (search_query, search_query, search_query, search_query, search_query, search_query))
             else:
-                cursor.execute("SELECT * FROM records")
+                cursor.execute("SELECT * FROM records ORDER BY id DESC")
             return cursor.fetchall()
 
     def get_record_by_id(self, record_id):
